@@ -1,0 +1,98 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>NOUR RUN 🎀</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;overflow:hidden;font-family:Arial,sans-serif;background:#ffb9d9;touch-action:none;user-select:none}
+#game{display:block;width:100vw;height:100dvh}
+#hud{position:absolute;top:15px;left:0;right:0;display:flex;justify-content:space-around;color:#fff;font-weight:bold;font-size:18px;text-shadow:0 2px 5px #9b3b78;pointer-events:none}
+#overlay{position:absolute;inset:0;background:#542449aa;display:flex;align-items:center;justify-content:center;text-align:center;color:white;padding:25px}
+.panel{background:#ff77b5;border:4px solid white;border-radius:25px;padding:25px;width:min(330px,95%);box-shadow:0 8px 0 #bc4685}
+h1{margin:0 0 12px;font-size:40px}
+button{border:0;border-radius:30px;padding:14px 25px;background:#fff;color:#d83c88;font-size:20px;font-weight:bold;margin-top:12px}
+#controls{position:absolute;bottom:20px;left:0;right:0;display:flex;justify-content:space-between;padding:0 20px;pointer-events:none}
+.ctrl{pointer-events:auto;background:#ffffffb8;color:#a62d71;font-size:27px;width:65px;height:60px;padding:0;border:2px solid white}
+#hint{font-size:13px}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="hud"><span>⭐ Score: <b id="score">0</b></span><span>🪙 <b id="coins">0</b></span></div>
+<div id="overlay"><div class="panel">
+<h1>🎀 NOUR RUN</h1>
+<p>Help Nour run, dodge trains and collect coins!</p>
+<p>⬅️ ➡️ Change lanes<br>⬆️ Jump over obstacles</p>
+<button id="start">LET'S RUN! 💗</button>
+<p id="hint">Tap the buttons or swipe the screen</p>
+</div></div>
+<div id="controls">
+<button class="ctrl" id="left">⬅️</button>
+<button class="ctrl" id="jump">⬆️</button>
+<button class="ctrl" id="right">➡️</button>
+</div>
+<script>
+const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
+let W,H,playing=false,lane=1,jump=0,score=0,coins=0,speed=4,objects=[],spawn=0,last=0;
+function resize(){W=canvas.width=innerWidth*devicePixelRatio;H=canvas.height=innerHeight*devicePixelRatio;ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);W=innerWidth;H=innerHeight}
+addEventListener('resize',resize);resize();
+function roadY(y){return H*.43+(y/H)*H*.65}
+function laneX(l,y){let width= W*(.18+(y/H)*.65);return W/2+(l-1)*width*.49}
+function rounded(x,y,w,h,r,color){ctx.fillStyle=color;ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill()}
+function draw(){
+ctx.clearRect(0,0,W,H);
+let g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,'#8be8ff');g.addColorStop(.55,'#ffd5e8');g.addColorStop(1,'#ff9ecb');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+// scenery
+ctx.fillStyle='#63c98a';ctx.fillRect(0,H*.42,W,H*.58);
+for(let i=0;i<8;i++){let y=(i*137+(score*2)%137)%H*.42;ctx.fillStyle=i%2?'#51b978':'#399c67';ctx.beginPath();ctx.arc(25,y+40,25,0,7);ctx.fill();ctx.beginPath();ctx.arc(W-25,y+20,28,0,7);ctx.fill()}
+// railway perspective
+ctx.fillStyle='#777783';ctx.beginPath();ctx.moveTo(W*.34,H*.42);ctx.lineTo(W*.66,H*.42);ctx.lineTo(W*1.05,H);ctx.lineTo(-W*.05,H);ctx.closePath();ctx.fill();
+ctx.strokeStyle='#e9e9ee';ctx.lineWidth=4;
+for(let l=0;l<4;l++){ctx.beginPath();ctx.moveTo(W*(.36+l*.093),H*.42);ctx.lineTo(W*(-.08+l*.39),H);ctx.stroke()}
+for(let i=0;i<13;i++){let y=H*.43+((i*53+score*5)%(H*.6));let p=(y/H);ctx.strokeStyle='#b7b7c3';ctx.lineWidth=1+p*5;ctx.beginPath();ctx.moveTo(W/2-W*p*.35,y);ctx.lineTo(W/2+W*p*.35,y);ctx.stroke()}
+objects.sort((a,b)=>a.y-b.y);
+for(const o of objects){
+let x=laneX(o.lane,o.y),s=.3+o.y/H*.9;
+if(o.type==='coin'){ctx.font=`${28*s}px Arial`;ctx.textAlign='center';ctx.fillText('🪙',x,o.y)}
+else{rounded(x-20*s,o.y-28*s,40*s,56*s,7*s,o.type==='train'?'#e84775':'#7956a8');ctx.fillStyle='#fff';ctx.fillRect(x-13*s,o.y-17*s,9*s,10*s);ctx.fillRect(x+4*s,o.y-17*s,9*s,10*s);ctx.fillStyle='#ffe66d';ctx.fillRect(x-14*s,o.y+14*s,28*s,5*s)}
+}
+// Nour
+let px=laneX(lane,H*.79),py=H*.77-jump;
+ctx.save();ctx.translate(px,py);
+ctx.fillStyle='#000';ctx.beginPath();ctx.arc(0,-34,17,0,7);ctx.fill();
+ctx.fillStyle='#f4c29f';ctx.beginPath();ctx.arc(0,-33,12,0,7);ctx.fill();
+ctx.fillStyle='#18121b';ctx.beginPath();ctx.arc(-2,-40,15,3.2,6.2);ctx.fill();ctx.fillRect(8,-39,7,23);
+rounded(-15,-19,30,34,9,'#ff3f9c');
+ctx.strokeStyle='#f4c29f';ctx.lineWidth=7;ctx.lineCap='round';
+ctx.beginPath();ctx.moveTo(-11,-10);ctx.lineTo(-20,4);ctx.moveTo(11,-10);ctx.lineTo(19,2);ctx.stroke();
+ctx.strokeStyle='#34324c';ctx.lineWidth=8;ctx.beginPath();ctx.moveTo(-7,13);ctx.lineTo(-10,30);ctx.moveTo(7,13);ctx.lineTo(11,30);ctx.stroke();
+ctx.fillStyle='#fff';ctx.font='15px Arial';ctx.fillText('🎀',-6,-45);ctx.restore();
+}
+function spawnObject(){let l=Math.floor(Math.random()*3);let r=Math.random();objects.push({lane:l,y:H*.43,type:r<.22?'coin':r<.58?'train':'block',hit:false})}
+function move(d){if(!playing)return;lane=Math.max(0,Math.min(2,lane+d))}
+function doJump(){if(playing&&jump===0){jump=100}}
+function endGame(){playing=false;document.querySelector('#overlay').style.display='flex';document.querySelector('.panel').innerHTML=`<h1>Game Over 💗</h1><p>⭐ Score: ${Math.floor(score)}<br>🪙 Coins: ${coins}</p><button id="start">RUN AGAIN 🎀</button>`;document.getElementById('start').onclick=startGame}
+function startGame(){lane=1;jump=0;score=0;coins=0;speed=4;objects=[];spawn=0;playing=true;document.querySelector('#overlay').style.display='none';document.getElementById('score').textContent='0';document.getElementById('coins').textContent='0'}
+document.getElementById('start').onclick=startGame;
+document.getElementById('left').onclick=()=>move(-1);document.getElementById('right').onclick=()=>move(1);document.getElementById('jump').onclick=doJump;
+let tx=0,ty=0;
+canvas.addEventListener('touchstart',e=>{tx=e.touches[0].clientX;ty=e.touches[0].clientY},{passive:true});
+canvas.addEventListener('touchend',e=>{let dx=e.changedTouches[0].clientX-tx,dy=e.changedTouches[0].clientY-ty;if(Math.abs(dx)>30)move(dx>0?1:-1);else if(dy< -20)doJump()},{passive:true});
+addEventListener('keydown',e=>{if(e.key==='ArrowLeft')move(-1);if(e.key==='ArrowRight')move(1);if(e.key==='ArrowUp'||e.key===' ')doJump()});
+function loop(t){let dt=Math.min((t-last)/16||1,2);last=t;
+if(playing){score+=dt;speed=Math.min(10,4+score/500);spawn-=dt;if(spawn<=0){spawnObject();spawn=55/speed*4}
+if(jump>0)jump=Math.max(0,jump-5*dt);
+for(const o of objects){o.y+=speed*dt*(.5+o.y/H);
+if(!o.hit&&o.y>H*.70&&o.y<H*.86&&o.lane===lane){if(o.type==='coin'){coins++;o.hit=true;o.y=H+100}else if(jump<35){o.hit=true;endGame()}}
+}
+objects=objects.filter(o=>o.y<H+50&&!o.hit);
+document.getElementById('score').textContent=Math.floor(score);document.getElementById('coins').textContent=coins;
+}
+draw();requestAnimationFrame(loop)}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
